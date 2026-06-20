@@ -59,18 +59,20 @@ export const PasteMethodSetting: React.FC<PasteMethodProps> = React.memo(
         );
       }
 
-      // External script is only available on Linux
+      // External script shells out through Linux tooling; Capglue is supported on
+      // both Linux and macOS.
       if (osType === "linux") {
-        options.push(
-          {
-            value: "external_script",
-            label: t("settings.advanced.pasteMethod.options.externalScript"),
-          },
-          {
-            value: "capglue",
-            label: t("settings.advanced.pasteMethod.options.capglue"),
-          },
-        );
+        options.push({
+          value: "external_script",
+          label: t("settings.advanced.pasteMethod.options.externalScript"),
+        });
+      }
+
+      if (osType === "linux" || osType === "macos") {
+        options.push({
+          value: "capglue",
+          label: t("settings.advanced.pasteMethod.options.capglue"),
+        });
       }
 
       return options;
