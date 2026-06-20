@@ -17,7 +17,62 @@ test.describe("Handy App", () => {
   });
 });
 
-test("post_processing_settings_show_promptv3_and_capglue_unavailable_state", async ({
+test("asr_initial_prompt_settings_show_promptv3_text", async ({ page }) => {
+  await page.goto("/");
+
+  await page.evaluate(async () => {
+    const [React, ReactDom, settingsModule, storeModule, bindingsModule] =
+      await Promise.all([
+        import("/node_modules/.vite/deps/react.js"),
+        import("/node_modules/.vite/deps/react-dom_client.js"),
+        import("/src/components/settings/AsrInitialPrompt.tsx"),
+        import("/src/stores/settingsStore.ts"),
+        import("/src/bindings.ts"),
+      ]);
+
+    bindingsModule.commands.changeAsrPromptEnabledSetting = async () => ({
+      status: "ok",
+      data: null,
+    });
+    bindingsModule.commands.changeAsrInitialPromptSetting = async () => ({
+      status: "ok",
+      data: null,
+    });
+
+    const settings = {
+      asr_prompt_enabled: true,
+      asr_initial_prompt:
+        "Расставляй пунктуацию в русской диктовке. Сохраняй английские IT-термины латиницей: GitHub, Claude Code, Cursor, OpenAI, API, JSON, TypeScript, JavaScript, Python, Rust, Tauri, React, macOS, Docker, Kubernetes, branch, commit, merge request, pull request, deploy, production, config.",
+    };
+
+    storeModule.useSettingsStore.setState({
+      settings,
+      defaultSettings: settings,
+      isLoading: false,
+      isUpdating: {},
+      settingErrors: {},
+    });
+
+    document.body.innerHTML = '<div id="test-root"></div>';
+    const createRoot = ReactDom.createRoot ?? ReactDom.default.createRoot;
+    const createElement = React.createElement ?? React.default.createElement;
+    createRoot(document.getElementById("test-root")).render(
+      createElement(settingsModule.AsrInitialPrompt, {
+        descriptionMode: "inline",
+        grouped: true,
+      }),
+    );
+  });
+
+  await expect(page.getByText("ASR initial prompt")).toBeVisible();
+  await expect(page.getByRole("checkbox")).toBeChecked();
+  await expect(page.getByText("Initial prompt text")).toBeVisible();
+  await expect(
+    page.getByPlaceholder("Prompt used before/during ASR recognition"),
+  ).toHaveValue(/Claude Code/);
+});
+
+test("post_processing_settings_show_capglue_unavailable_state", async ({
   page,
 }) => {
   await page.goto("/");
@@ -67,18 +122,22 @@ test("post_processing_settings_show_promptv3_and_capglue_unavailable_state", asy
       post_process_enabled: true,
       post_process_provider_id: "openai",
       post_process_providers: [
-        { id: "openai", label: "OpenAI", base_url: "https://api.openai.com/v1" },
+        {
+          id: "openai",
+          label: "OpenAI",
+          base_url: "https://api.openai.com/v1",
+        },
       ],
       post_process_api_keys: {},
       post_process_models: { openai: "gpt-4o-mini" },
       post_process_prompts: [
         {
-          id: "promptv3",
-          name: "promptv3",
-          prompt: "Turn ${output} into a ready-to-use prompt.",
+          id: "default_improve_transcriptions",
+          name: "Improve Transcriptions",
+          prompt: "Improve ${output}",
         },
       ],
-      post_process_selected_prompt_id: "promptv3",
+      post_process_selected_prompt_id: "default_improve_transcriptions",
       experimental_enabled: true,
       keyboard_implementation: "tauri",
     };
@@ -100,18 +159,16 @@ test("post_processing_settings_show_promptv3_and_capglue_unavailable_state", asy
     );
   });
 
-  await expect(page.getByText("promptv3").first()).toBeVisible();
-  await expect(page.getByLabel("Prompt label")).toHaveValue("promptv3");
-  await expect(page.getByLabel("Prompt instructions")).toHaveValue(
-    "Turn ${output} into a ready-to-use prompt.",
-  );
+  await expect(page.getByText("promptv3")).toHaveCount(0);
 
   await page.getByRole("button", { name: /Clipboard/ }).click();
   await page.getByRole("button", { name: "Capglue" }).click();
   await expect(
     page.getByText(/Capglue is selected but no target is configured yet/),
   ).toBeVisible();
-  await expect(page.getByPlaceholder("Capglue target (required)")).toBeVisible();
+  await expect(
+    page.getByPlaceholder("Capglue target (required)"),
+  ).toBeVisible();
 });
 
 test("capglue_invalid_save_rolls_back_and_exposes_error", async ({ page }) => {

@@ -9,6 +9,8 @@ use tauri_plugin_store::StoreExt;
 
 pub const APPLE_INTELLIGENCE_PROVIDER_ID: &str = "apple_intelligence";
 pub const APPLE_INTELLIGENCE_DEFAULT_MODEL_ID: &str = "Apple Intelligence";
+const LEGACY_PROMPTV3_PROMPT_ID: &str = "promptv3";
+const LEGACY_PROMPTV3_PROMPT_TEXT: &str = "Rewrite the transcript into a concise, high-signal prompt for an AI assistant. Preserve user intent, constraints, names, code terms, URLs, and any explicit output format. Remove filler words and speech artifacts. Return only the improved prompt.\n\nTranscript:\n${output}";
 
 #[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "lowercase")]
@@ -691,6 +693,17 @@ fn default_typing_tool() -> TypingTool {
 
 fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
     let mut changed = false;
+
+    let prompt_count_before = settings.post_process_prompts.len();
+    settings.post_process_prompts.retain(|prompt| {
+        !(prompt.id == LEGACY_PROMPTV3_PROMPT_ID
+            && prompt.name == "promptv3"
+            && prompt.prompt == LEGACY_PROMPTV3_PROMPT_TEXT)
+    });
+    if settings.post_process_prompts.len() != prompt_count_before {
+        changed = true;
+    }
+
     for default_prompt in default_post_process_prompts() {
         if !settings
             .post_process_prompts
@@ -1084,5 +1097,44 @@ mod tests {
             .post_process_prompts
             .iter()
             .any(|prompt| prompt.id == "promptv3"));
+    }
+
+    #[test]
+    fn ensure_post_process_defaults_removes_legacy_builtin_promptv3() {
+        let mut settings = get_default_settings();
+        settings.post_process_prompts.push(LLMPrompt {
+            id: LEGACY_PROMPTV3_PROMPT_ID.to_string(),
+            name: "promptv3".to_string(),
+            prompt: LEGACY_PROMPTV3_PROMPT_TEXT.to_string(),
+        });
+        settings.post_process_selected_prompt_id = Some(LEGACY_PROMPTV3_PROMPT_ID.to_string());
+
+        assert!(ensure_post_process_defaults(&mut settings));
+
+        assert!(!settings
+            .post_process_prompts
+            .iter()
+            .any(|prompt| prompt.id == LEGACY_PROMPTV3_PROMPT_ID));
+        assert_ne!(
+            settings.post_process_selected_prompt_id.as_deref(),
+            Some(LEGACY_PROMPTV3_PROMPT_ID)
+        );
+    }
+
+    #[test]
+    fn ensure_post_process_defaults_keeps_user_edited_promptv3() {
+        let mut settings = get_default_settings();
+        settings.post_process_prompts.push(LLMPrompt {
+            id: LEGACY_PROMPTV3_PROMPT_ID.to_string(),
+            name: "promptv3".to_string(),
+            prompt: "User edited prompt".to_string(),
+        });
+
+        assert!(!ensure_post_process_defaults(&mut settings));
+
+        assert!(settings
+            .post_process_prompts
+            .iter()
+            .any(|prompt| prompt.id == LEGACY_PROMPTV3_PROMPT_ID));
     }
 }
