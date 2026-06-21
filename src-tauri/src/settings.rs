@@ -9,7 +9,8 @@ use tauri_plugin_store::StoreExt;
 
 pub const APPLE_INTELLIGENCE_PROVIDER_ID: &str = "apple_intelligence";
 pub const APPLE_INTELLIGENCE_DEFAULT_MODEL_ID: &str = "Apple Intelligence";
-pub const PROMPTV3_PROMPT_ID: &str = "promptv3";
+const LEGACY_PROMPTV3_PROMPT_ID: &str = "promptv3";
+const LEGACY_PROMPTV3_PROMPT_TEXT: &str = "Rewrite the transcript into a concise, high-signal prompt for an AI assistant. Preserve user intent, constraints, names, code terms, URLs, and any explicit output format. Remove filler words and speech artifacts. Return only the improved prompt.\n\nTranscript:\n${output}";
 
 #[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "lowercase")]
@@ -391,6 +392,10 @@ pub struct AppSettings {
     pub log_level: LogLevel,
     #[serde(default)]
     pub custom_words: Vec<String>,
+    #[serde(default = "default_asr_prompt_enabled")]
+    pub asr_prompt_enabled: bool,
+    #[serde(default = "default_asr_initial_prompt")]
+    pub asr_initial_prompt: String,
     #[serde(default)]
     pub model_unload_timeout: ModelUnloadTimeout,
     #[serde(default = "default_word_correction_threshold")]
@@ -452,6 +457,14 @@ pub struct AppSettings {
     pub whisper_gpu_device: i32,
     #[serde(default)]
     pub extra_recording_buffer_ms: u64,
+}
+
+fn default_asr_prompt_enabled() -> bool {
+    false
+}
+
+fn default_asr_initial_prompt() -> String {
+    "Расставляй пунктуацию в русской диктовке. Сохраняй английские IT-термины латиницей: GitHub, Claude Code, Cursor, OpenAI, API, JSON, TypeScript, JavaScript, Python, Rust, Tauri, React, macOS, Docker, Kubernetes, branch, commit, merge request, pull request, deploy, production, config. Используй точки, запятые, двоеточия, вопросительные знаки, кавычки-ёлочки и длинные тире там, где они нужны по смыслу.".to_string()
 }
 
 fn default_model() -> String {
@@ -660,17 +673,8 @@ fn default_post_process_models() -> HashMap<String, String> {
     map
 }
 
-fn promptv3_prompt() -> LLMPrompt {
-    LLMPrompt {
-        id: PROMPTV3_PROMPT_ID.to_string(),
-        name: "promptv3".to_string(),
-        prompt: "Rewrite the transcript into a concise, high-signal prompt for an AI assistant. Preserve user intent, constraints, names, code terms, URLs, and any explicit output format. Remove filler words and speech artifacts. Return only the improved prompt.\n\nTranscript:\n${output}".to_string(),
-    }
-}
-
 fn default_post_process_prompts() -> Vec<LLMPrompt> {
     vec![
-        promptv3_prompt(),
         LLMPrompt {
             id: "default_improve_transcriptions".to_string(),
             name: "Improve Transcriptions".to_string(),
@@ -689,6 +693,17 @@ fn default_typing_tool() -> TypingTool {
 
 fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
     let mut changed = false;
+
+    let prompt_count_before = settings.post_process_prompts.len();
+    settings.post_process_prompts.retain(|prompt| {
+        !(prompt.id == LEGACY_PROMPTV3_PROMPT_ID
+            && prompt.name == "promptv3"
+            && prompt.prompt == LEGACY_PROMPTV3_PROMPT_TEXT)
+    });
+    if settings.post_process_prompts.len() != prompt_count_before {
+        changed = true;
+    }
+
     for default_prompt in default_post_process_prompts() {
         if !settings
             .post_process_prompts
@@ -714,8 +729,7 @@ fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
         settings.post_process_selected_prompt_id = settings
             .post_process_prompts
             .iter()
-            .find(|prompt| prompt.id == PROMPTV3_PROMPT_ID)
-            .or_else(|| settings.post_process_prompts.first())
+            .first()
             .map(|prompt| prompt.id.clone());
         changed = true;
     }
@@ -848,6 +862,8 @@ pub fn get_default_settings() -> AppSettings {
         debug_mode: false,
         log_level: default_log_level(),
         custom_words: Vec::new(),
+        asr_prompt_enabled: default_asr_prompt_enabled(),
+        asr_initial_prompt: default_asr_initial_prompt(),
         model_unload_timeout: ModelUnloadTimeout::default(),
         word_correction_threshold: default_word_correction_threshold(),
         history_limit: default_history_limit(),
@@ -862,7 +878,9 @@ pub fn get_default_settings() -> AppSettings {
         post_process_api_keys: default_post_process_api_keys(),
         post_process_models: default_post_process_models(),
         post_process_prompts: default_post_process_prompts(),
-        post_process_selected_prompt_id: Some(PROMPTV3_PROMPT_ID.to_string()),
+        post_process_selected_prompt_id: default_post_process_prompts()
+            .first()
+            .map(|prompt| prompt.id.clone()),
         mute_while_recording: false,
         append_trailing_space: false,
         app_language: default_app_language(),
@@ -1053,22 +1071,70 @@ mod tests {
     }
 
     #[test]
-    fn ensure_post_process_defaults_selects_promptv3_when_missing() {
+    fn ensure_post_process_defaults_selects_first_prompt_when_missing() {
         let mut settings = get_default_settings();
         settings.post_process_prompts.clear();
         settings.post_process_selected_prompt_id = None;
 
         assert!(ensure_post_process_defaults(&mut settings));
 
-        let promptv3 = settings
+        let first_prompt = settings
             .post_process_prompts
-            .iter()
-            .find(|prompt| prompt.id == "promptv3")
-            .expect("promptv3 should be installed as a built-in prompt");
-        assert_eq!(promptv3.name, "promptv3");
+            .first()
+            .expect("a built-in post-processing prompt should be installed");
         assert_eq!(
             settings.post_process_selected_prompt_id.as_deref(),
-            Some("promptv3")
+            Some(first_prompt.id.as_str())
         );
+    }
+
+    #[test]
+    fn default_asr_initial_prompt_is_not_an_llm_post_process_prompt() {
+        let settings = get_default_settings();
+        assert!(!settings.asr_prompt_enabled);
+        assert!(settings.asr_initial_prompt.contains("пунктуацию"));
+        assert!(!settings
+            .post_process_prompts
+            .iter()
+            .any(|prompt| prompt.id == "promptv3"));
+    }
+
+    #[test]
+    fn ensure_post_process_defaults_removes_legacy_builtin_promptv3() {
+        let mut settings = get_default_settings();
+        settings.post_process_prompts.push(LLMPrompt {
+            id: LEGACY_PROMPTV3_PROMPT_ID.to_string(),
+            name: "promptv3".to_string(),
+            prompt: LEGACY_PROMPTV3_PROMPT_TEXT.to_string(),
+        });
+        settings.post_process_selected_prompt_id = Some(LEGACY_PROMPTV3_PROMPT_ID.to_string());
+
+        assert!(ensure_post_process_defaults(&mut settings));
+
+        assert!(!settings
+            .post_process_prompts
+            .iter()
+            .any(|prompt| prompt.id == LEGACY_PROMPTV3_PROMPT_ID));
+        assert_ne!(
+            settings.post_process_selected_prompt_id.as_deref(),
+            Some(LEGACY_PROMPTV3_PROMPT_ID)
+        );
+    }
+
+    #[test]
+    fn ensure_post_process_defaults_keeps_user_edited_promptv3() {
+        let mut settings = get_default_settings();
+        settings.post_process_prompts.push(LLMPrompt {
+            id: LEGACY_PROMPTV3_PROMPT_ID.to_string(),
+            name: "promptv3".to_string(),
+            prompt: "User edited prompt".to_string(),
+        });
+
+        assert!(!ensure_post_process_defaults(&mut settings));
+
+        assert!(settings
+            .post_process_prompts
+            .iter()
+            .any(|prompt| prompt.id == LEGACY_PROMPTV3_PROMPT_ID));
     }
 }
