@@ -728,7 +728,6 @@ fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
     if !selected_prompt_exists {
         settings.post_process_selected_prompt_id = settings
             .post_process_prompts
-            .iter()
             .first()
             .map(|prompt| prompt.id.clone());
         changed = true;
