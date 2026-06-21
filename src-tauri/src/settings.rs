@@ -1122,6 +1122,28 @@ mod tests {
     }
 
     #[test]
+    fn ensure_post_process_defaults_selects_first_prompt_after_legacy_prompt_removal() {
+        let mut settings = get_default_settings();
+        settings.post_process_prompts.push(LLMPrompt {
+            id: LEGACY_PROMPTV3_PROMPT_ID.to_string(),
+            name: "promptv3".to_string(),
+            prompt: LEGACY_PROMPTV3_PROMPT_TEXT.to_string(),
+        });
+        settings.post_process_selected_prompt_id = Some(LEGACY_PROMPTV3_PROMPT_ID.to_string());
+
+        assert!(ensure_post_process_defaults(&mut settings));
+
+        let first_prompt = settings
+            .post_process_prompts
+            .first()
+            .expect("post-processing defaults should remain available");
+        assert_eq!(
+            settings.post_process_selected_prompt_id.as_deref(),
+            Some(first_prompt.id.as_str())
+        );
+    }
+
+    #[test]
     fn ensure_post_process_defaults_keeps_user_edited_promptv3() {
         let mut settings = get_default_settings();
         settings.post_process_prompts.push(LLMPrompt {
