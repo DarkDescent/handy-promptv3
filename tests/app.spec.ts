@@ -72,7 +72,7 @@ test("asr_initial_prompt_settings_show_promptv3_text", async ({ page }) => {
   ).toHaveValue(/Claude Code/);
 });
 
-test("post_processing_settings_show_capglue_unavailable_state", async ({
+test("post_processing_settings_no_longer_shows_capglue_paste_method", async ({
   page,
 }) => {
   await page.goto("/");
@@ -92,9 +92,7 @@ test("post_processing_settings_show_capglue_unavailable_state", async ({
       await Promise.all([
         import("/node_modules/.vite/deps/react.js"),
         import("/node_modules/.vite/deps/react-dom_client.js"),
-        import(
-          "/src/components/settings/post-processing/PostProcessingSettings.tsx"
-        ),
+        import("/src/components/settings/PasteMethod.tsx"),
         import("/src/stores/settingsStore.ts"),
         import("/src/bindings.ts"),
       ]);
@@ -118,7 +116,6 @@ test("post_processing_settings_show_capglue_unavailable_state", async ({
       audio_feedback: false,
       paste_method: "ctrl_v",
       external_script_path: null,
-      capglue_settings: { target: "", command: "capglue", args: [] },
       post_process_enabled: true,
       post_process_provider_id: "openai",
       post_process_providers: [
@@ -155,23 +152,20 @@ test("post_processing_settings_show_capglue_unavailable_state", async ({
     const createRoot = ReactDom.createRoot ?? ReactDom.default.createRoot;
     const createElement = React.createElement ?? React.default.createElement;
     createRoot(document.getElementById("test-root")).render(
-      createElement(settingsModule.PostProcessingSettings),
+      createElement(settingsModule.PasteMethodSetting),
     );
   });
 
-  await expect(page.getByText("promptv3")).toHaveCount(0);
+  await expect(page.getByText("Capglue")).toHaveCount(0);
 
   await page.getByRole("button", { name: /Clipboard/ }).click();
-  await page.getByRole("button", { name: "Capglue" }).click();
+  await expect(page.getByRole("button", { name: "Capglue" })).toHaveCount(0);
   await expect(
-    page.getByText(/Capglue is selected but no target is configured yet/),
-  ).toBeVisible();
-  await expect(
-    page.getByPlaceholder("Capglue target (required)"),
+    page.getByRole("button", { name: "External Script" }),
   ).toBeVisible();
 });
 
-test("post_processing_settings_show_capglue_paste_method_on_macos", async ({
+test("post_processing_settings_hide_capglue_paste_method_on_macos", async ({
   page,
 }) => {
   await page.goto("/");
@@ -191,9 +185,7 @@ test("post_processing_settings_show_capglue_paste_method_on_macos", async ({
       await Promise.all([
         import("/node_modules/.vite/deps/react.js"),
         import("/node_modules/.vite/deps/react-dom_client.js"),
-        import(
-          "/src/components/settings/post-processing/PostProcessingSettings.tsx"
-        ),
+        import("/src/components/settings/PasteMethod.tsx"),
         import("/src/stores/settingsStore.ts"),
         import("/src/bindings.ts"),
       ]);
@@ -209,7 +201,6 @@ test("post_processing_settings_show_capglue_paste_method_on_macos", async ({
       audio_feedback: false,
       paste_method: "ctrl_v",
       external_script_path: null,
-      capglue_settings: { target: "", command: "capglue", args: [] },
       post_process_enabled: true,
       post_process_provider_id: "openai",
       post_process_providers: [
@@ -240,66 +231,13 @@ test("post_processing_settings_show_capglue_paste_method_on_macos", async ({
     const createRoot = ReactDom.createRoot ?? ReactDom.default.createRoot;
     const createElement = React.createElement ?? React.default.createElement;
     createRoot(document.getElementById("test-root")).render(
-      createElement(settingsModule.PostProcessingSettings),
+      createElement(settingsModule.PasteMethodSetting),
     );
   });
 
   await page.getByRole("button", { name: /Clipboard \(Cmd\+V\)/ }).click();
-  await expect(page.getByRole("button", { name: "Capglue" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Capglue" })).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "External Script" }),
   ).toHaveCount(0);
-});
-
-test("capglue_invalid_save_rolls_back_and_exposes_error", async ({ page }) => {
-  await page.goto("/");
-
-  const result = await page.evaluate(async () => {
-    const [{ commands }, { useSettingsStore }] = await Promise.all([
-      import("/src/bindings.ts"),
-      import("/src/stores/settingsStore.ts"),
-    ]);
-
-    const persistedSettings = {
-      capglue_settings: {
-        target: "com.persisted.Target",
-        command: "capglue",
-        args: [],
-      },
-    };
-
-    commands.getAppSettings = async () => ({
-      status: "ok",
-      data: persistedSettings,
-    });
-    commands.changeCapglueSettingsSetting = async () => ({
-      status: "error",
-      error: "capglue target is required",
-    });
-
-    useSettingsStore.setState({
-      settings: persistedSettings,
-      defaultSettings: persistedSettings,
-      isLoading: false,
-      isUpdating: {},
-    });
-
-    await useSettingsStore.getState().updateSetting("capglue_settings", {
-      target: "",
-      command: "capglue",
-      args: [],
-    });
-
-    return {
-      capglueSettings: useSettingsStore.getState().settings?.capglue_settings,
-      error: useSettingsStore.getState().getSettingError("capglue_settings"),
-    };
-  });
-
-  expect(result.capglueSettings).toEqual({
-    target: "com.persisted.Target",
-    command: "capglue",
-    args: [],
-  });
-  expect(result.error).toContain("capglue target is required");
 });

@@ -4,7 +4,6 @@ import { listen } from "@tauri-apps/api/event";
 import type {
   AppSettings as Settings,
   AudioDevice,
-  CapglueSettings,
   WhisperAcceleratorSetting,
   OrtAcceleratorSetting,
 } from "@/bindings";
@@ -143,14 +142,6 @@ const settingUpdaters: {
   typing_tool: (value) => commands.changeTypingToolSetting(value as string),
   external_script_path: (value) =>
     commands.changeExternalScriptPathSetting(value as string | null),
-  capglue_settings: (value) => {
-    const settings = value as CapglueSettings;
-    return commands.changeCapglueSettingsSetting(
-      settings.target,
-      settings.command,
-      settings.args ?? [],
-    );
-  },
   clipboard_handling: (value) =>
     commands.changeClipboardHandlingSetting(value as string),
   auto_submit: (value) => commands.changeAutoSubmitSetting(value as boolean),
@@ -341,9 +332,6 @@ export const useSettingsStore = create<SettingsStore>()(
         );
         if (settings) {
           set({ settings: { ...settings, [key]: originalValue } });
-        }
-        if (key === "capglue_settings") {
-          await get().refreshSettings();
         }
       } finally {
         setUpdating(updateKey, false);
