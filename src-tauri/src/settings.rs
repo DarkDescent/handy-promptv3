@@ -459,7 +459,6 @@ pub struct AppSettings {
     pub typing_tool: TypingTool,
     pub external_script_path: Option<String>,
     #[serde(default)]
-    #[serde(default)]
     pub custom_filler_words: Option<Vec<String>>,
     #[serde(default)]
     pub whisper_accelerator: WhisperAcceleratorSetting,
