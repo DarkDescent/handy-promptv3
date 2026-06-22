@@ -3,9 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Dropdown } from "../ui/Dropdown";
 import { SettingContainer } from "../ui/SettingContainer";
 import { Input } from "../ui/Input";
-import { Alert } from "../ui/Alert";
 import { useSettings } from "../../hooks/useSettings";
-import { useSettingsStore } from "../../stores/settingsStore";
 import { useOsType } from "../../hooks/useOsType";
 import type { PasteMethod } from "@/bindings";
 
@@ -18,7 +16,6 @@ export const PasteMethodSetting: React.FC<PasteMethodProps> = React.memo(
   ({ descriptionMode = "tooltip", grouped = false }) => {
     const { t } = useTranslation();
     const { getSetting, updateSetting, isUpdating } = useSettings();
-    const getSettingError = useSettingsStore((state) => state.getSettingError);
     const osType = useOsType();
 
     const getPasteMethodOptions = (osType: string) => {
@@ -59,19 +56,11 @@ export const PasteMethodSetting: React.FC<PasteMethodProps> = React.memo(
         );
       }
 
-      // External script shells out through Linux tooling; Capglue is supported on
-      // both Linux and macOS.
+      // External script shells out through Linux tooling, so keep it Linux-only.
       if (osType === "linux") {
         options.push({
           value: "external_script",
           label: t("settings.advanced.pasteMethod.options.externalScript"),
-        });
-      }
-
-      if (osType === "linux" || osType === "macos") {
-        options.push({
-          value: "capglue",
-          label: t("settings.advanced.pasteMethod.options.capglue"),
         });
       }
 
@@ -81,21 +70,6 @@ export const PasteMethodSetting: React.FC<PasteMethodProps> = React.memo(
     const selectedMethod = (getSetting("paste_method") ||
       "ctrl_v") as PasteMethod;
     const externalScriptPath = getSetting("external_script_path") || "";
-    const capglueSettings = getSetting("capglue_settings") || {
-      target: "",
-      command: "capglue",
-      args: [],
-    };
-    const capglueError = getSettingError("capglue_settings");
-
-    const updateCapglueSettings = (
-      updates: Partial<typeof capglueSettings>,
-    ) => {
-      updateSetting("capglue_settings", {
-        ...capglueSettings,
-        ...updates,
-      });
-    };
 
     const pasteMethodOptions = getPasteMethodOptions(osType);
 
@@ -128,42 +102,6 @@ export const PasteMethodSetting: React.FC<PasteMethodProps> = React.memo(
               )}
               disabled={isUpdating("external_script_path")}
             />
-          )}
-          {selectedMethod === "capglue" && (
-            <div className="flex flex-col gap-2">
-              <p className="text-xs text-mid-gray/70">
-                {capglueSettings.target
-                  ? t("settings.advanced.pasteMethod.capglueHelp")
-                  : t("settings.advanced.pasteMethod.capglueUnavailable")}
-              </p>
-              {capglueError && (
-                <Alert variant="error" contained>
-                  {capglueError}
-                </Alert>
-              )}
-              <Input
-                type="text"
-                value={capglueSettings.target}
-                onChange={(e) =>
-                  updateCapglueSettings({ target: e.target.value })
-                }
-                placeholder={t(
-                  "settings.advanced.pasteMethod.capglueTargetPlaceholder",
-                )}
-                disabled={isUpdating("capglue_settings")}
-              />
-              <Input
-                type="text"
-                value={capglueSettings.command}
-                onChange={(e) =>
-                  updateCapglueSettings({ command: e.target.value })
-                }
-                placeholder={t(
-                  "settings.advanced.pasteMethod.capglueCommandPlaceholder",
-                )}
-                disabled={isUpdating("capglue_settings")}
-              />
-            </div>
           )}
         </div>
       </SettingContainer>

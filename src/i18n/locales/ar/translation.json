@@ -278,14 +278,9 @@
           "clipboardShiftInsert": "الحافظة (Shift+Insert)",
           "direct": "مباشر",
           "none": "بلا",
-          "externalScript": "نص برمجي خارجي",
-          "capglue": "Capglue"
+          "externalScript": "نص برمجي خارجي"
         },
-        "externalScriptPlaceholder": "/path/to/your/script.sh",
-        "capglueHelp": "Capglue sends processed text to the configured target. It does not fall back to clipboard when delivery fails.",
-        "capglueUnavailable": "Capglue is selected but no target is configured yet. Add a target before using this output mode.",
-        "capglueTargetPlaceholder": "Capglue target (required)",
-        "capglueCommandPlaceholder": "capglue"
+        "externalScriptPlaceholder": "/path/to/your/script.sh"
       },
       "typingTool": {
         "title": "أداة الكتابة",
@@ -344,7 +339,7 @@
         "toggleLabel": "ASR initial prompt",
         "toggleDescription": "Send an initial prompt to Whisper-family ASR models before transcription. Use this for punctuation, Latin IT terms, and code-switching hints. This is not LLM post-processing.",
         "title": "Initial prompt text",
-        "description": "Applied during recognition for Whisper/Breeze models, then custom words are appended. Capglue still runs after transcription when selected as the paste method.",
+        "description": "Applied during recognition for Whisper/Breeze models, then custom words are appended.",
         "placeholder": "Prompt used before/during ASR recognition"
       }
     },
@@ -406,10 +401,6 @@
         "cancel": "إلغاء",
         "selectToEdit": ".اختر مطالبة أعلاه لعرض وتعديل تفاصيلها",
         "createFirst": ".انقر على 'إنشاء مطالبة جديدة' أعلاه لإنشاء أول مطالبة معالجة لاحقة لك"
-      },
-      "capglue": {
-        "title": "Capglue",
-        "help": "Choose Capglue in Advanced → Paste Method to deliver post-processed text to a configured target. Invalid or unavailable Capglue settings produce a visible error instead of silent clipboard fallback."
       }
     },
     "history": {

@@ -129,7 +129,7 @@ pub enum ModelUnloadTimeout {
     Sec15, // Debug mode only
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum PasteMethod {
     CtrlV,
@@ -138,24 +138,37 @@ pub enum PasteMethod {
     ShiftInsert,
     CtrlShiftV,
     ExternalScript,
-    Capglue,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Type)]
-pub struct CapglueSettings {
-    pub target: String,
-    pub command: String,
-    #[serde(default)]
-    pub args: Vec<String>,
-}
-
-impl Default for CapglueSettings {
-    fn default() -> Self {
-        Self {
-            target: String::new(),
-            command: "capglue".to_string(),
-            args: Vec::new(),
-        }
+impl<'de> Deserialize<'de> for PasteMethod {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "ctrl_v" => PasteMethod::CtrlV,
+            "direct" => PasteMethod::Direct,
+            "none" => PasteMethod::None,
+            "shift_insert" => PasteMethod::ShiftInsert,
+            "ctrl_shift_v" => PasteMethod::CtrlShiftV,
+            "external_script" => PasteMethod::ExternalScript,
+            // Legacy Capglue paste mode was removed; fall back to normal clipboard paste.
+            "capglue" => PasteMethod::CtrlV,
+            other => {
+                return Err(de::Error::unknown_variant(
+                    other,
+                    &[
+                        "ctrl_v",
+                        "direct",
+                        "none",
+                        "shift_insert",
+                        "ctrl_shift_v",
+                        "external_script",
+                    ],
+                ))
+            }
+        })
     }
 }
 
@@ -446,7 +459,6 @@ pub struct AppSettings {
     pub typing_tool: TypingTool,
     pub external_script_path: Option<String>,
     #[serde(default)]
-    pub capglue_settings: CapglueSettings,
     #[serde(default)]
     pub custom_filler_words: Option<Vec<String>>,
     #[serde(default)]
@@ -890,7 +902,6 @@ pub fn get_default_settings() -> AppSettings {
         paste_delay_ms: default_paste_delay_ms(),
         typing_tool: default_typing_tool(),
         external_script_path: None,
-        capglue_settings: CapglueSettings::default(),
         custom_filler_words: None,
         whisper_accelerator: WhisperAcceleratorSetting::default(),
         ort_accelerator: OrtAcceleratorSetting::default(),
