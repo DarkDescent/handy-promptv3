@@ -30,16 +30,18 @@ test("asr_initial_prompt_settings_show_promptv3_text", async ({ page }) => {
         import("/src/bindings.ts"),
       ]);
 
-    bindingsModule.commands.changeAsrPromptEnabledSetting = async () => ({
-      status: "ok",
-      data: null,
-    });
-    bindingsModule.commands.changeAsrInitialPromptSetting = async () => ({
-      status: "ok",
-      data: null,
-    });
+    (window as any).__asrSetterCalls = [];
+    bindingsModule.commands.changeAsrPromptEnabledSetting = async (enabled) => {
+      (window as any).__asrSetterCalls.push(["enabled", enabled]);
+      return { status: "ok", data: null };
+    };
+    bindingsModule.commands.changeAsrInitialPromptSetting = async (prompt) => {
+      (window as any).__asrSetterCalls.push(["prompt", prompt]);
+      return { status: "ok", data: null };
+    };
 
     const settings = {
+      shortcut_activation: "hold_or_toggle",
       asr_prompt_enabled: true,
       asr_initial_prompt:
         "Расставляй пунктуацию в русской диктовке. Сохраняй английские IT-термины латиницей: GitHub, Claude Code, Cursor, OpenAI, API, JSON, TypeScript, JavaScript, Python, Rust, Tauri, React, macOS, Docker, Kubernetes, branch, commit, merge request, pull request, deploy, production, config.",
@@ -70,6 +72,19 @@ test("asr_initial_prompt_settings_show_promptv3_text", async ({ page }) => {
   await expect(
     page.getByPlaceholder("Prompt used before/during ASR recognition"),
   ).toHaveValue(/Claude Code/);
+  await page
+    .locator("label")
+    .filter({ has: page.getByRole("checkbox") })
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__asrSetterCalls))
+    .toContainEqual(["enabled", false]);
+  await page
+    .getByPlaceholder("Prompt used before/during ASR recognition")
+    .fill("New ASR hint");
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__asrSetterCalls))
+    .toContainEqual(["prompt", "New ASR hint"]);
 });
 
 test("post_processing_settings_no_longer_shows_capglue_paste_method", async ({
@@ -112,7 +127,7 @@ test("post_processing_settings_no_longer_shows_capglue_paste_method", async ({
           current_binding: "CmdOrCtrl+Shift+P",
         },
       },
-      push_to_talk: false,
+      shortcut_activation: "hold_or_toggle",
       audio_feedback: false,
       paste_method: "ctrl_v",
       external_script_path: null,
@@ -197,7 +212,7 @@ test("post_processing_settings_hide_capglue_paste_method_on_macos", async ({
 
     const settings = {
       bindings: {},
-      push_to_talk: false,
+      shortcut_activation: "hold_or_toggle",
       audio_feedback: false,
       paste_method: "ctrl_v",
       external_script_path: null,
